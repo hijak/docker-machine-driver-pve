@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -28,6 +29,7 @@ const (
 	flagMemoryBalloon    = "pve-memory-balloon"
 	flagFullClone        = "pve-full-clone"
 	flagTags             = "pve-tags"
+	flagTemplateMap      = "pve-template-map"
 )
 
 // Default values for flags.
@@ -55,6 +57,10 @@ type config struct {
 
 	// ID of the Proxmox VE template.
 	TemplateID int
+
+	// Map of node names to template IDs for per-node template selection.
+	// If provided, overrides TemplateID for specific nodes.
+	TemplateMap map[string]int
 
 	// Bus/Device of the CD/DVD Drive to mount cloud-init ISO to (e.g. 'scsi1').
 	ISODeviceName string
@@ -165,6 +171,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: flagEnvVarFromFlagName(flagTags),
 			Usage:  "Comma-separated list of tags to assign to the VM",
 		},
+		mcnflag.StringFlag{
+			Name:   flagTemplateMap,
+			EnvVar: flagEnvVarFromFlagName(flagTemplateMap),
+			Usage:  "JSON map of node names to template IDs (e.g. '{\"node1\": 100, \"node2\": 200}'). If provided, enables multi-node distribution with per-node templates.",
+		},
 	}
 }
 
@@ -268,6 +279,21 @@ func (d *Driver) SetConfigFromFlags(opts drivers.DriverOptions) error {
 	d.FullClone = opts.Bool(flagFullClone)
 
 	d.Tags = strings.Split(opts.String(flagTags), ",")
+
+	// Parse template map if provided
+	templateMapStr := opts.String(flagTemplateMap)
+	if templateMapStr != "" {
+		d.TemplateMap = make(map[string]int)
+		if err := json.Unmarshal([]byte(templateMapStr), &d.TemplateMap); err != nil {
+			return fmt.Errorf("failed to parse '--%s': invalid JSON: %w", flagTemplateMap, err)
+		}
+		// Validate template IDs in the map
+		for nodeName, templateID := range d.TemplateMap {
+			if templateID <= 0 {
+				return fmt.Errorf("failed to parse '--%s': template ID for node '%s' must be > 0", flagTemplateMap, nodeName)
+			}
+		}
+	}
 
 	return nil
 }

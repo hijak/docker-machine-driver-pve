@@ -50,10 +50,51 @@ func (d *Driver) PreCreateCheck() error {
 		return err
 	}
 
-	// Check template
-	template, err := d.getPVETemplate(context.TODO())
+	// Validate templates
+	if len(d.TemplateMap) > 0 {
+		// Validate all templates in the map
+		for nodeName, templateID := range d.TemplateMap {
+			if err := d.validateTemplate(context.TODO(), templateID, nodeName); err != nil {
+				return fmt.Errorf("template validation failed for node '%s' (template ID='%d'): %w", nodeName, templateID, err)
+			}
+		}
+		log.Debugf("Using resource pool '%s'", resourcePool.PoolID)
+		log.Debugf("Validated %d templates for multi-node distribution", len(d.TemplateMap))
+		log.Debugf("Using device '%s' for cloud-init ISO", d.ISODeviceName)
+		log.Debugf("Using network interface '%s' for IP address", d.NetworkInterfaceName)
+	} else {
+		// Check single template (existing behavior)
+		template, err := d.getPVETemplate(context.TODO())
+		if err != nil {
+			return err
+		}
+
+		if err := d.validateTemplate(context.TODO(), d.TemplateID, ""); err != nil {
+			return err
+		}
+
+		log.Debugf("Using resource pool '%s'", resourcePool.PoolID)
+		log.Debugf("Using template name '%s' on node '%s'", template.Name, template.Node)
+		log.Debugf("Using device '%s' for cloud-init ISO", d.ISODeviceName)
+		log.Debugf("Using network interface '%s' for IP address", d.NetworkInterfaceName)
+	}
+
+	return nil
+}
+
+// Validates a template has the required ISO device and network interface.
+func (d *Driver) validateTemplate(ctx context.Context, templateID int, nodeName string) error {
+	var template *proxmox.VirtualMachine
+	var err error
+
+	if nodeName != "" {
+		template, err = d.getPVETemplate(ctx, nodeName)
+	} else {
+		template, err = d.getPVETemplate(ctx)
+	}
+
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve template ID='%d': %w", templateID, err)
 	}
 
 	// Check ISO device
@@ -86,11 +127,6 @@ func (d *Driver) PreCreateCheck() error {
 	if !networkInterfaceFound {
 		return fmt.Errorf("network interface '%s' not found on the template", d.NetworkInterfaceName)
 	}
-
-	log.Debugf("Using resource pool '%s'", resourcePool.PoolID)
-	log.Debugf("Using template name '%s' on node '%s'", template.Name, template.Node)
-	log.Debugf("Using device '%s' for cloud-init ISO", d.ISODeviceName)
-	log.Debugf("Using network interface '%s' for IP address", d.NetworkInterfaceName)
 
 	return nil
 }

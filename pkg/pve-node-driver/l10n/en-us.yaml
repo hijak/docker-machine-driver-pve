@@ -45,6 +45,14 @@ cluster:
         cloning:
           label: Force full clone
           tooltip: Forces full copy of all disks, even if underlying storage supports linked clones
+      templateMap:
+        header: Multi-Node Template Mapping
+        label: Template Map (JSON)
+        tooltip: |
+          Optional JSON map of node names to template IDs for multi-node distribution.
+          Example: {"node1": 100, "node2": 200, "node3": 100}
+          If provided, VMs will be distributed across nodes using round-robin selection.
+          Each node will use its specified template ID.
       hardware:
         header: Hardware
         processorSockets:

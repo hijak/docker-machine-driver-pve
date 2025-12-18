@@ -61,6 +61,7 @@ export default {
         memoryBalloon: this.value.memoryBalloon ? parseInt(this.value.memoryBalloon) : "",
         fullClone: this.value.fullClone ?? false,
         tags: this.value.tags ?? '',
+        templateMap: this.value.templateMap ?? '',
       },
     }
   },
@@ -233,6 +234,26 @@ export default {
         return
       }
 
+      // Validate template map if provided
+      if(this.currentValue.templateMap != '') {
+        try {
+          const templateMapObj = JSON.parse(this.currentValue.templateMap);
+          if(typeof templateMapObj !== 'object' || Array.isArray(templateMapObj)) {
+            this.$emit('validationChanged', false);
+            return;
+          }
+          for(const [nodeName, templateID] of Object.entries(templateMapObj)) {
+            if(typeof templateID !== 'number' || templateID < 1) {
+              this.$emit('validationChanged', false);
+              return;
+            }
+          }
+        } catch(e) {
+          this.$emit('validationChanged', false);
+          return;
+        }
+      }
+
       // Copy current value to the 'value' prop
       this.value.resourcePool = this.currentValue.resourcePool;
       this.value.template = this.currentValue.template.toString();
@@ -245,6 +266,7 @@ export default {
       this.value.memory = this.currentValue.memory.toString();
       this.value.memoryBalloon = this.currentValue.memoryBalloon.toString();
       this.value.fullClone = this.currentValue.fullClone;
+      this.value.templateMap = this.currentValue.templateMap;
 
       this.$emit('validationChanged', true);
     },
@@ -688,7 +710,7 @@ export default {
       <h3>
         <t k="cluster.machineConfig.pve.template.header" />
       </h3>
-      <div class="row">
+      <div class="row mb-20">
         <div class="col span-6">
           <!-- Force full clone -->
           <Checkbox
@@ -696,6 +718,24 @@ export default {
             v-model:value="currentValue.fullClone"
             label-key="cluster.machineConfig.pve.template.cloning.label"
             tooltip-key="cluster.machineConfig.pve.template.cloning.tooltip"
+          />
+        </div>
+      </div>
+
+      <h3>
+        <t k="cluster.machineConfig.pve.templateMap.header" />
+      </h3>
+      <div class="row mb-20">
+        <div class="col span-12">
+          <!-- Template Map -->
+          <LabeledInput
+            type="textarea"
+            :mode="mode"
+            v-model:value="currentValue.templateMap"
+            label-key="cluster.machineConfig.pve.templateMap.label"
+            tooltip-key="cluster.machineConfig.pve.templateMap.tooltip"
+            placeholder='{"node1": 100, "node2": 200}'
+            rows="3"
           />
         </div>
       </div>
